@@ -20,3 +20,11 @@ ios/Flutter/*.sh
 *.iml
 
 .DS_Store
+
+# Flutter generated
+.dart_tool/
+build/
+.tmp/
+.flutter-plugins
+.flutter-plugins-dependencies
+
