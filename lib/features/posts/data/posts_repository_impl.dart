@@ -17,12 +17,17 @@ class PostsRepositoryImpl implements PostsRepository {
   }
 
   @override
-  Future<List<Post>> fetchPosts() async {
-    final remote = await _api.fetchPosts();
-    await _local.setRemoteCache(remote);
+  Future<List<Post>> fetchPosts({int start = 0, int limit = 20}) async {
+    final remotePage = await _api.fetchPosts(start: start, limit: limit);
 
-    final created = _local.getCreatedCache();
-    return [...created, ...remote];
+    if (start == 0) {
+      await _local.setRemoteCache(remotePage);
+    } else {
+      final current = _local.getRemoteCache();
+      await _local.setRemoteCache([...current, ...remotePage]);
+    }
+
+    return getCachedPosts();
   }
 
   @override
@@ -31,7 +36,7 @@ class PostsRepositoryImpl implements PostsRepository {
 
     final safe = Post(
       userId: created.userId ?? 1,
-      id: created.id ?? _nextLocalId(),
+      id: _nextLocalId(),
       title: created.title,
       body: created.body,
     );
@@ -40,11 +45,16 @@ class PostsRepositoryImpl implements PostsRepository {
     return safe;
   }
 
+  @override
+  Future<void> deleteLocalPost(int id) async {
+    await _local.removeCreatedById(id);
+  }
+
   int _nextLocalId() {
     final created = _local.getCreatedCache();
-    final maxCreated = created.fold<int>(100, (maxId, post) {
-      final id = post.id ?? 0;
-      return id > maxId ? id : maxId;
+    final maxCreated = created.fold<int>(100, (max, p) {
+      final id = p.id ?? 0;
+      return id > max ? id : max;
     });
     return maxCreated + 1;
   }
