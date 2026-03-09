@@ -48,6 +48,14 @@ class PostsLocalDataSource {
     await _writeList(_createdKey, created);
   }
 
+  Future<void> upsertCreated(Post post) async {
+    final created = getCreatedCache();
+    final id = post.id ?? -1;
+    created.removeWhere((p) => (p.id ?? -1) == id);
+    created.insert(0, post);
+    await _writeList(_createdKey, created);
+  }
+
   Future<void> removeCreatedById(int id) async {
     final created = getCreatedCache();
     created.removeWhere((post) => (post.id ?? -1) == id);

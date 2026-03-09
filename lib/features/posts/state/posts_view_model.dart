@@ -1,104 +1,165 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/posts_repository.dart';
 import '../model/post.dart';
-import 'posts_providers.dart';
+import 'posts_dependencies.dart';
 
-class PostsViewModel extends AsyncNotifier<List<Post>> {
+class PostsPageData {
+  const PostsPageData({
+    required this.posts,
+    required this.hasMore,
+    required this.isLoadingMore,
+  });
+
+  final List<Post> posts;
+  final bool hasMore;
+  final bool isLoadingMore;
+
+  PostsPageData copyWith({
+    List<Post>? posts,
+    bool? hasMore,
+    bool? isLoadingMore,
+  }) {
+    return PostsPageData(
+      posts: posts ?? this.posts,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+}
+
+class PostsViewModel extends AsyncNotifier<PostsPageData> {
   static const int _pageSize = 20;
-  static const int _localPostMinId = 101;
+  static const int _remoteTotal = 100;
+  static const int _localMinId = 101;
 
   late final PostsRepository _repo;
 
-  void _syncUiState({required bool hasMore, required bool isLoadingMore}) {
-    Future.microtask(() {
-      ref.read(postsHasMoreProvider.notifier).set(hasMore);
-      ref.read(postsIsLoadingMoreProvider.notifier).set(isLoadingMore);
-    });
+  int _remoteShown = 0;
+
+  bool _isLocal(Post post) => (post.id ?? 0) >= _localMinId;
+  bool _isRemote(Post post) => (post.id ?? 0) > 0 && (post.id ?? 0) < _localMinId;
+
+  List<Post> _localsFrom(List<Post> all) => all.where(_isLocal).toList();
+  List<Post> _remotesFrom(List<Post> all) => all.where(_isRemote).toList();
+
+  PostsPageData _makeData(List<Post> all, {required bool isLoadingMore}) {
+    final locals = _localsFrom(all);
+    final remotes = _remotesFrom(all);
+    final shown = math.min(_remoteShown, remotes.length);
+    final composed = <Post>[...locals, ...remotes.take(shown)];
+
+    final canRevealMore = remotes.length > _remoteShown;
+    final canFetchMore = remotes.length < _remoteTotal;
+
+    return PostsPageData(
+      posts: composed,
+      hasMore: canRevealMore || canFetchMore,
+      isLoadingMore: isLoadingMore,
+    );
   }
 
   @override
-  Future<List<Post>> build() async {
+  Future<PostsPageData> build() async {
     _repo = ref.watch(postsRepositoryProvider);
 
     final cached = _repo.getCachedPosts();
+    final cachedRemotes = _remotesFrom(cached);
+
     if (cached.isNotEmpty) {
-      _syncUiState(
-        hasMore: _inferHasMoreFromCache(cached),
-        isLoadingMore: false,
-      );
-      return cached;
+      _remoteShown = math.min(_pageSize, cachedRemotes.length);
+      return _makeData(cached, isLoadingMore: false);
     }
 
-    final fresh = await _repo.fetchPosts(start: 0, limit: _pageSize);
-    _syncUiState(
-      hasMore: _remoteCount(fresh) == _pageSize,
-      isLoadingMore: false,
-    );
-    return fresh;
+    await _repo.fetchPosts(start: 0, limit: _pageSize);
+    final all = _repo.getCachedPosts();
+    final remotes = _remotesFrom(all);
+    _remoteShown = math.min(_pageSize, remotes.length);
+
+    return _makeData(all, isLoadingMore: false);
   }
 
   Future<void> refresh() async {
-    ref.read(postsIsLoadingMoreProvider.notifier).set(false);
-
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(
-      () => _repo.fetchPosts(start: 0, limit: _pageSize),
-    );
 
-    final current = state.value ?? const <Post>[];
-    ref.read(postsHasMoreProvider.notifier).set(_remoteCount(current) == _pageSize);
+    state = await AsyncValue.guard(() async {
+      await _repo.fetchPosts(start: 0, limit: _pageSize);
+      final all = _repo.getCachedPosts();
+      final remotes = _remotesFrom(all);
+      _remoteShown = math.min(_pageSize, remotes.length);
+      return _makeData(all, isLoadingMore: false);
+    });
   }
 
   Future<void> loadMore() async {
-    final hasMore = ref.read(postsHasMoreProvider);
-    final isLoading = ref.read(postsIsLoadingMoreProvider);
-    if (!hasMore || isLoading) {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.isLoadingMore) {
       return;
     }
 
-    ref.read(postsIsLoadingMoreProvider.notifier).set(true);
+    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
 
     try {
-      final current = state.value ?? const <Post>[];
-      final previousRemoteCount = _remoteCount(current);
-      final more = await _repo.fetchPosts(
-        start: previousRemoteCount,
-        limit: _pageSize,
-      );
-      final fetchedRemoteCount = _remoteCount(more) - previousRemoteCount;
-      state = AsyncValue.data(more);
-      ref
-          .read(postsHasMoreProvider.notifier)
-          .set(fetchedRemoteCount == _pageSize);
-    } finally {
-      ref.read(postsIsLoadingMoreProvider.notifier).set(false);
+      final cachedNow = _repo.getCachedPosts();
+      final cachedRemotes = _remotesFrom(cachedNow);
+
+      if (cachedRemotes.length > _remoteShown) {
+        _remoteShown = math.min(_remoteShown + _pageSize, cachedRemotes.length);
+        state = AsyncValue.data(_makeData(cachedNow, isLoadingMore: false));
+        return;
+      }
+
+      final beforeRemoteCount = cachedRemotes.length;
+      if (beforeRemoteCount >= _remoteTotal) {
+        state = AsyncValue.data(_makeData(cachedNow, isLoadingMore: false));
+        return;
+      }
+
+      await _repo.fetchPosts(start: beforeRemoteCount, limit: _pageSize);
+
+      final all = _repo.getCachedPosts();
+      final afterRemoteCount = _remotesFrom(all).length;
+      _remoteShown = math.min(_remoteShown + _pageSize, afterRemoteCount);
+
+      state = AsyncValue.data(_makeData(all, isLoadingMore: false));
+    } catch (_) {
+      final fallbackAll = _repo.getCachedPosts();
+      state = AsyncValue.data(_makeData(fallbackAll, isLoadingMore: false));
+      rethrow;
     }
   }
 
   Future<void> create({required String title, required String body}) async {
-    final current = state.value ?? const <Post>[];
-    final created = await _repo.createPost(title: title, body: body);
-    state = AsyncValue.data([created, ...current]);
+    if (state.value == null) {
+      return;
+    }
+
+    await _repo.createPost(title: title, body: body);
+
+    final all = _repo.getCachedPosts();
+    state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 
   Future<void> deleteLocal(int id) async {
-    final current = state.value ?? const <Post>[];
-    state = AsyncValue.data(
-      current.where((post) => (post.id ?? -1) != id).toList(),
-    );
+    final current = state.value;
+    if (current == null) {
+      return;
+    }
+
+    final optimistic = current.posts.where((post) => (post.id ?? -1) != id).toList();
+    state = AsyncValue.data(current.copyWith(posts: optimistic));
+
     await _repo.deleteLocalPost(id);
+
+    final all = _repo.getCachedPosts();
+    state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 
-  bool _inferHasMoreFromCache(List<Post> posts) {
-    final remoteCount = _remoteCount(posts);
-    return remoteCount == 0 || remoteCount % _pageSize == 0;
-  }
-
-  int _remoteCount(List<Post> posts) {
-    return posts.where((post) {
-      final id = post.id;
-      return id != null && id < _localPostMinId;
-    }).length;
+  Future<void> restoreLocal(Post post) async {
+    await _repo.restoreLocalPost(post);
+    final all = _repo.getCachedPosts();
+    state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 }

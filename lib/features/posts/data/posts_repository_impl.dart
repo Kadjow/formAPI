@@ -50,6 +50,11 @@ class PostsRepositoryImpl implements PostsRepository {
     await _local.removeCreatedById(id);
   }
 
+  @override
+  Future<void> restoreLocalPost(Post post) async {
+    await _local.upsertCreated(post);
+  }
+
   int _nextLocalId() {
     final created = _local.getCreatedCache();
     final maxCreated = created.fold<int>(100, (max, p) {

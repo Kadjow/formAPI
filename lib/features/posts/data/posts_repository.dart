@@ -8,4 +8,6 @@ abstract class PostsRepository {
   Future<Post> createPost({required String title, required String body});
 
   Future<void> deleteLocalPost(int id);
+
+  Future<void> restoreLocalPost(Post post);
 }
