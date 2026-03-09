@@ -42,10 +42,9 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
     setState(() => _submitting = true);
 
     try {
-      await ref.read(postsViewModelProvider.notifier).create(
-            title: _titleCtrl.text.trim(),
-            body: _bodyCtrl.text.trim(),
-          );
+      await ref
+          .read(postsViewModelProvider.notifier)
+          .create(title: _titleCtrl.text.trim(), body: _bodyCtrl.text.trim());
 
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -71,114 +70,132 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
       body: SafeArea(
         child: Form(
           key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
+          child: Column(
             children: [
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: theme.dividerColor.withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Titulo',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  children: [
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: theme.dividerColor.withValues(alpha: 0.4),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Ate $_titleMax caracteres.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _titleCtrl,
-                        textInputAction: TextInputAction.next,
-                        maxLength: _titleMax,
-                        decoration: InputDecoration(
-                          hintText: 'Digite um titulo objetivo',
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.35),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Titulo',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Ate $_titleMax caracteres.',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _titleCtrl,
+                              textInputAction: TextInputAction.next,
+                              maxLength: _titleMax,
+                              decoration: InputDecoration(
+                                hintText: 'Digite um titulo objetivo',
+                                filled: true,
+                                fillColor: theme
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.35),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              validator: (v) =>
+                                  _validateRequiredMax(v, _titleMax, 'Titulo'),
+                            ),
+                          ],
                         ),
-                        validator: (v) => _validateRequiredMax(v, _titleMax, 'Titulo'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 14),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: theme.dividerColor.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Descricao',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Use ate $_bodyMax caracteres.',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _bodyCtrl,
+                              maxLines: 6,
+                              maxLength: _bodyMax,
+                              decoration: InputDecoration(
+                                hintText: 'Descreva o conteudo do post',
+                                alignLabelWithHint: true,
+                                filled: true,
+                                fillColor: theme
+                                    .colorScheme
+                                    .surfaceContainerHighest
+                                    .withValues(alpha: 0.35),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              validator: (v) => _validateRequiredMax(
+                                v,
+                                _bodyMax,
+                                'Descricao',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: theme.dividerColor.withValues(alpha: 0.4),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: FilledButton.icon(
+                    onPressed: canSubmit ? _submit : null,
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_submitting ? 'Salvando...' : 'Salvar post'),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Descricao',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Use ate $_bodyMax caracteres.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        controller: _bodyCtrl,
-                        maxLines: 6,
-                        maxLength: _bodyMax,
-                        decoration: InputDecoration(
-                          hintText: 'Descreva o conteudo do post',
-                          alignLabelWithHint: true,
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.35),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        validator: (v) => _validateRequiredMax(v, _bodyMax, 'Descricao'),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                height: 54,
-                child: FilledButton.icon(
-                  onPressed: canSubmit ? _submit : null,
-                  icon: _submitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_outlined),
-                  label: Text(_submitting ? 'Salvando...' : 'Salvar post'),
                 ),
               ),
             ],
