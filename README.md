@@ -1,17 +1,52 @@
-# formapi
+# FormAPI (Flutter)
 
-A new Flutter project.
+Aplicativo Flutter que consome a API pública do JSONPlaceholder para listar posts e permite criar novos posts via formulário.  
+Projeto desenvolvido com foco em boas práticas, arquitetura (MVVM), gerenciamento de estado, serialização, validação e testes.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## Funcionalidades
 
-A few resources to get you started if this is your first Flutter project:
+- **Listagem de posts** (título e descrição) via API
+- **Criação de post** com formulário (título + descrição)
+- **Validação de formulário**
+  - Obrigatório
+  - Limite de caracteres (Título **60**, Descrição **200**)
+- **Paginação controlada** com botão “Carregar mais”
+- **Detalhes do post** ao tocar em um item
+- **Posts locais**
+  - Posts criados são persistidos localmente
+  - Remoção por swipe com **Desfazer (Undo)**
+- **Tema Light/Dark** com transição suave e persistência
+- **Splash screen** animada
+- **Testes unitários e de widget**
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Arquitetura e organização
+
+Arquitetura adotada: **MVVM** com **Riverpod**.
+
+### Fluxo
+**UI → ViewModel (state) → Repository (data) → (API / Cache Local)**
+
+### Estrutura (resumo)
+- `lib/features/posts/ui/` — telas (listagem, criação, detalhes)
+- `lib/features/posts/state/` — ViewModel + providers (Riverpod)
+- `lib/features/posts/data/` — repository + API service + local datasource
+- `lib/core/` — utilitários globais (storage, snackbars, theme etc.)
+- `test/` — testes unitários e de widget
+
+---
+
+## Como rodar o projeto
+
+### Pré-requisitos
+- Flutter instalado e configurado
+- Emulador ou dispositivo conectado
+
+### Rodar
+```bash
+flutter clean 
+flutter pub get
+flutter run
