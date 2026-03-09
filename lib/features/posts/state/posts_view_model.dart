@@ -11,21 +11,33 @@ class PostsPageData {
     required this.posts,
     required this.hasMore,
     required this.isLoadingMore,
+    this.loadMoreErrorId = 0,
+    this.loadMoreError,
   });
+
+  static const Object _loadMoreErrorSentinel = Object();
 
   final List<Post> posts;
   final bool hasMore;
   final bool isLoadingMore;
+  final int loadMoreErrorId;
+  final String? loadMoreError;
 
   PostsPageData copyWith({
     List<Post>? posts,
     bool? hasMore,
     bool? isLoadingMore,
+    int? loadMoreErrorId,
+    Object? loadMoreError = _loadMoreErrorSentinel,
   }) {
     return PostsPageData(
       posts: posts ?? this.posts,
       hasMore: hasMore ?? this.hasMore,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      loadMoreErrorId: loadMoreErrorId ?? this.loadMoreErrorId,
+      loadMoreError: identical(loadMoreError, _loadMoreErrorSentinel)
+          ? this.loadMoreError
+          : loadMoreError as String?,
     );
   }
 }
@@ -38,6 +50,8 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
   late final PostsRepository _repo;
 
   int _remoteShown = 0;
+  int _loadMoreErrorId = 0;
+  String? _loadMoreError;
 
   bool _isLocal(Post post) => (post.id ?? 0) >= _localMinId;
   bool _isRemote(Post post) => (post.id ?? 0) > 0 && (post.id ?? 0) < _localMinId;
@@ -58,6 +72,8 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
       posts: composed,
       hasMore: canRevealMore || canFetchMore,
       isLoadingMore: isLoadingMore,
+      loadMoreErrorId: _loadMoreErrorId,
+      loadMoreError: _loadMoreError,
     );
   }
 
@@ -70,6 +86,7 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
 
     if (cached.isNotEmpty) {
       _remoteShown = math.min(_pageSize, cachedRemotes.length);
+      _loadMoreError = null;
       return _makeData(cached, isLoadingMore: false);
     }
 
@@ -77,6 +94,7 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
     final all = _repo.getCachedPosts();
     final remotes = _remotesFrom(all);
     _remoteShown = math.min(_pageSize, remotes.length);
+    _loadMoreError = null;
 
     return _makeData(all, isLoadingMore: false);
   }
@@ -89,6 +107,7 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
       final all = _repo.getCachedPosts();
       final remotes = _remotesFrom(all);
       _remoteShown = math.min(_pageSize, remotes.length);
+      _loadMoreError = null;
       return _makeData(all, isLoadingMore: false);
     });
   }
@@ -99,7 +118,13 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
       return;
     }
 
-    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
+    _loadMoreError = null;
+    state = AsyncValue.data(
+      current.copyWith(
+        isLoadingMore: true,
+        loadMoreError: null,
+      ),
+    );
 
     try {
       final cachedNow = _repo.getCachedPosts();
@@ -125,9 +150,15 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
 
       state = AsyncValue.data(_makeData(all, isLoadingMore: false));
     } catch (_) {
-      final fallbackAll = _repo.getCachedPosts();
-      state = AsyncValue.data(_makeData(fallbackAll, isLoadingMore: false));
-      rethrow;
+      _loadMoreErrorId++;
+      _loadMoreError = 'Não foi possível carregar mais posts. Tente novamente.';
+      state = AsyncValue.data(
+        current.copyWith(
+          isLoadingMore: false,
+          loadMoreErrorId: _loadMoreErrorId,
+          loadMoreError: _loadMoreError,
+        ),
+      );
     }
   }
 
@@ -139,6 +170,7 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
     await _repo.createPost(title: title, body: body);
 
     final all = _repo.getCachedPosts();
+    _loadMoreError = null;
     state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 
@@ -154,12 +186,14 @@ class PostsViewModel extends AsyncNotifier<PostsPageData> {
     await _repo.deleteLocalPost(id);
 
     final all = _repo.getCachedPosts();
+    _loadMoreError = null;
     state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 
   Future<void> restoreLocal(Post post) async {
     await _repo.restoreLocalPost(post);
     final all = _repo.getCachedPosts();
+    _loadMoreError = null;
     state = AsyncValue.data(_makeData(all, isLoadingMore: false));
   }
 }

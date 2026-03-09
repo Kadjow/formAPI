@@ -17,12 +17,23 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
   final _bodyCtrl = TextEditingController();
 
   bool _submitting = false;
+  bool _canSubmit = false;
 
   static const int _titleMax = 60;
   static const int _bodyMax = 200;
 
   @override
+  void initState() {
+    super.initState();
+    _titleCtrl.addListener(_recomputeCanSubmit);
+    _bodyCtrl.addListener(_recomputeCanSubmit);
+    _recomputeCanSubmit();
+  }
+
+  @override
   void dispose() {
+    _titleCtrl.removeListener(_recomputeCanSubmit);
+    _bodyCtrl.removeListener(_recomputeCanSubmit);
     _titleCtrl.dispose();
     _bodyCtrl.dispose();
     super.dispose();
@@ -35,11 +46,30 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
     return null;
   }
 
+  void _recomputeCanSubmit() {
+    final title = _titleCtrl.text.trim();
+    final body = _bodyCtrl.text.trim();
+    final valid = title.isNotEmpty &&
+        title.length <= _titleMax &&
+        body.isNotEmpty &&
+        body.length <= _bodyMax &&
+        !_submitting;
+
+    if (_canSubmit == valid) {
+      return;
+    }
+
+    setState(() => _canSubmit = valid);
+  }
+
   Future<void> _submit() async {
     final formOk = _formKey.currentState?.validate() ?? false;
     if (!formOk) return;
 
-    setState(() => _submitting = true);
+    setState(() {
+      _submitting = true;
+      _canSubmit = false;
+    });
 
     try {
       await ref
@@ -56,13 +86,15 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
         icon: Icons.error_outline,
       );
     } finally {
-      if (mounted) setState(() => _submitting = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+        _recomputeCanSubmit();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final canSubmit = !_submitting;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -186,7 +218,7 @@ class _CreatePostPageState extends ConsumerState<CreatePostPage> {
                   width: double.infinity,
                   height: 54,
                   child: FilledButton.icon(
-                    onPressed: canSubmit ? _submit : null,
+                    onPressed: _canSubmit ? _submit : null,
                     icon: _submitting
                         ? const SizedBox(
                             width: 18,

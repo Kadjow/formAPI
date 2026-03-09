@@ -18,6 +18,7 @@ class PostsListPage extends ConsumerStatefulWidget {
 class _PostsListPageState extends ConsumerState<PostsListPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabs;
+  int _lastLoadMoreErrorId = 0;
 
   @override
   void initState() {
@@ -53,6 +54,22 @@ class _PostsListPageState extends ConsumerState<PostsListPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(postsViewModelProvider, (prev, next) {
+      final data = next.asData?.value;
+      if (data == null) {
+        return;
+      }
+
+      if (data.loadMoreError != null && data.loadMoreErrorId != _lastLoadMoreErrorId) {
+        _lastLoadMoreErrorId = data.loadMoreErrorId;
+        AppSnackBar.show(
+          context,
+          data.loadMoreError!,
+          icon: Icons.error_outline,
+        );
+      }
+    });
+
     final state = ref.watch(postsViewModelProvider);
     final mode = ref.watch(themeModeProvider);
 
